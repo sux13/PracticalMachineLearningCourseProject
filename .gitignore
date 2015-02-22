@@ -1,2 +1,11 @@
-
+*.txt
 *.png
+Practical Machine Learning Course Notes.Rmd
+Practical Machine Learning Course Notes.md
+Practical Machine Learning Course Notes.pdf
+Practical Machine Learning Course Project.Rmd
+Practical_Machine_Learning_Course_Notes.html
+Practical_Machine_Learning_Course_Notes.pdf
+Practical_Machine_Learning_Course_Project.html
+Practical_Machine_Learning_Course_Project.pdf
+Practical_Machine_Learning_Course_Project_cache/
