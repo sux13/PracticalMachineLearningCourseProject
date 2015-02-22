@@ -1,0 +1,20 @@
+---
+title: "Machine Learning Course Project"
+author: "Xing Su"
+date: "February 21, 2015"
+output: pdf_document
+---
+
+## Processing Data
+
+```{r cache = TRUE}
+# download data 
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", 
+	destfile = "pml-training.csv", method = "curl")
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", 
+	destfile = "pml-testing.csv", method = "curl")
+# load data
+training <- read.csv("pml-training.csv", header = TRUE)
+test <- read.csv("pml-testing.csv", header = TRUE)
+
+```
