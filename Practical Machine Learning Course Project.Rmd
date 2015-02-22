@@ -2,19 +2,120 @@
 title: "Machine Learning Course Project"
 author: "Xing Su"
 date: "February 21, 2015"
-output: pdf_document
+output:
+  html_document:
+    toc: yes
 ---
 
 ## Processing Data
 
-```{r cache = TRUE}
-# download data 
-download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", 
-	destfile = "pml-training.csv", method = "curl")
-download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", 
-	destfile = "pml-testing.csv", method = "curl")
-# load data
-training <- read.csv("pml-training.csv", header = TRUE)
-test <- read.csv("pml-testing.csv", header = TRUE)
+First, we download the training and test datasets and load them in through the `read.csv` function. During my exploratory data analysis, I saw that blank values, "NA", and "#DIV/0!" often show up in data columns so I have decided to treat all of these values as `NA`. 
 
+```{r cache = TRUE, message=FALSE}
+# load packag
+library(caret)
+# download data 
+if(!file.exists("pml-training.csv")){
+	download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", 
+		destfile = "pml-training.csv", method = "curl")
+}
+if(!file.exists("pml-testing.csv")){
+	download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", 
+		destfile = "pml-testing.csv", method = "curl")
+}
+# load data
+train <- read.csv("pml-training.csv", header = TRUE, na.strings=c("","NA", "#DIV/0!"))
+test <- read.csv("pml-testing.csv", header = TRUE, na.strings=c("","NA", "#DIV/0!"))
 ```
+
+In order to run the machine learning algorithms, the features used cannot contain any `NA` values. To see which variables/features should be used, I calculated the percentage of NA's for each column. 
+
+```{r cache = TRUE}
+# see error percentage 
+NAPercent <- round(colMeans(is.na(train)), 2)
+table(NAPercent)
+```
+From above, we can see that only 60 variables have complete data so those are the variables we will use to build the prediction algorithm. I removed the first variable here because it is the row index from the csv file and not a true variable.
+
+```{r cache = TRUE}
+# find index of the complete columns minus the first 
+index <- which(NAPercent==0)[-1]
+# subset the data
+train <- train[, index]
+test <- test[, index]
+# looking at the structure of the data for the first 10 columns
+str(train[, 1:10])
+```
+From the structure of the data, we can see that the first 6 variables `user_name`, `raw_timestamp_part_1`, `raw_timestamp_part_2`, `cvtd_timestamp`, `new_window`, `num_window` are simply administrative parameters and are ***unlikely*** to help us predict the activity the subjects are performing. Therefore, we are going to leave those 6 columns out before we build the algorithm. In addition, to make the columns easier to deal with, we will go ahead and convert all features to `numeric` class.
+
+```{r cache = TRUE}
+# subset the data
+train <- train[, -(1:6)]
+test <- test[, -(1:6)]
+# convert all numerical data to numeric class
+for(i in 1:(length(train)-1)){
+    train[,i] <- as.numeric(train[,i])
+    test[,i] <- as.numeric(test[,i])
+}
+```
+
+## Cross Validation
+
+Forthis project, we will focus on using the two most widely-used, most accurate prediction algorithms, 
+
+We set `test` set aside and split the `train` data into two sections for cross validation. We will allocate 80% of the data to train the model and 20% to validate it.
+
+We expect that the out-of-bag (OOB) error rates returned by the models should be good estimate for  the out of sample error rate. We will get actual estimates of error rates from the **accuracies** achieved by the models.
+
+```{r cache = TRUE}
+# split train data set
+inTrain <- createDataPartition(y=train$classe,p=0.8, list=FALSE)
+trainData <- train[inTrain,]
+validation <- train[-inTrain,]
+# print out the dimentions of the 3 data sets
+rbind(trainData = dim(trainData), validation = dim(validation), test = dim(test))
+```
+
+## Comparing Model and Results 
+
+First, We will use **random forest** to build the first model. Because the algorithm is computationally intensive, we will leverage parallel processing using multiple cores through the `doMC` package
+
+```{r cache = TRUE, message=FALSE}
+# load doMC package 
+library(doMC)
+# set my cores 
+registerDoMC(cores = 8)
+# load randomForest package
+library(randomForest)
+# run the random forest algorithm on the training data set
+rfFit <- randomForest(classe~., data = trainData, method ="rf", prox = TRUE)
+rfFit
+# use model to predict on validation data set
+rfPred <- predict(rfFit, validation)
+# predicted result
+confusionMatrix(rfPred, validation$classe)
+```
+
+Next, we will try the **Generalized Boosted Regression Models**.
+
+```{r cache = TRUE, message=FALSE}
+# run the generalized boosted regression model
+gbmFit <- train(classe~., data = trainData, method ="gbm", verbose = FALSE)
+gbmFit
+# use model to predict on validation data set
+gbmPred <- predict(gbmFit, validation)
+# predicted result
+confusionMatrix(gbmPred, validation$classe)
+```
+From the above, we can see that **randomForest** is the better performing algorithm with **0.43%** out-of-bag (OOB) error rate, which is ***what we expect the out of sample error rate to be***. When applied to the validation set for cross validation, the model achieved an accuracy of **99.7%**, which indicates the actual error rate is **0.3%**, where as GBM has an accuracy of **96.0%** with error rate of **4.0%**.
+
+
+## Result
+
+We can apply the randomForest model to the 20 given test set for the predictions. The results were all correct.
+
+```{r cache = TRUE}
+# apply random forest model to test set
+predict(rfFit, test)
+```
+
